@@ -3,7 +3,7 @@ import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 
-/// The Home landing screen displayed after a user signs up or logs in.
+/// The Home landing screen dashboard displaying user greeting and account profile details.
 class HomeScreen extends StatelessWidget {
   final UserProfile userProfile;
   final AuthService authService;
