@@ -1,0 +1,5 @@
+package edu.lmu.mawa_app
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()
