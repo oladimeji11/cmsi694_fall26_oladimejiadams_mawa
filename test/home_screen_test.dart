@@ -77,7 +77,7 @@ void main() {
     // Verify Greeting
     expect(find.text('Hello, Jane!'), findsOneWidget);
     expect(
-      find.text('Your location-aware environmental safety dashboard.'),
+      find.text('Dashboard'),
       findsOneWidget,
     );
 

@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your location-aware environmental safety dashboard.',
+              'Dashboard',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
