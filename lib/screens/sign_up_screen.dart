@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
+import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -24,9 +25,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
 
   // Location selections (pre-selected defaults, expandable for future updates)
-  String _selectedCountry = 'US';
-  String _selectedState = 'California';
-  String _selectedCity = 'Los Angeles';
+  final String _selectedCountry = 'US';
+  final String _selectedState = 'California';
+  final String _selectedCity = 'Los Angeles';
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -101,24 +102,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
               children: [
                 Text(
                   'Welcome to MAWA',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'MAWA is a location-aware environmental intelligence app.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[800],
                         fontWeight: FontWeight.w500,
                       ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Sign up to receive personalized updates and briefings.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 24),
 
@@ -129,7 +125,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   decoration: const InputDecoration(
                     labelText: 'First Name',
                     prefixIcon: Icon(Icons.person_outline),
-                    border: OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -147,7 +142,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Last Name',
                     prefixIcon: Icon(Icons.person_outline),
-                    border: OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -165,7 +159,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email Address',
                     prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -201,7 +194,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         });
                       },
                     ),
-                    border: const OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -218,27 +210,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Location Header
                 Row(
                   children: [
-                    const Icon(Icons.location_on,
-                        size: 20, color: Colors.deepPurple),
+                    Icon(Icons.location_on,
+                        size: 20, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
                       'Primary Location',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
 
-                // Country Dropdown
+                // Country Dropdown (Styled with read-only fill #E6F0FB)
                 DropdownButtonFormField<String>(
                   value: _selectedCountry,
                   decoration: const InputDecoration(
                     labelText: 'Country',
                     prefixIcon: Icon(Icons.public_outlined),
-                    border: OutlineInputBorder(),
+                    fillColor: AppColors.readOnlyFill,
+                    filled: true,
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -246,23 +236,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: Text('United States (US)'),
                     ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedCountry = value;
-                      });
-                    }
-                  },
+                  onChanged: null, // Read-only for default Los Angeles CA location
                 ),
                 const SizedBox(height: 16),
 
-                // State Dropdown
+                // State Dropdown (Styled with read-only fill #E6F0FB)
                 DropdownButtonFormField<String>(
                   value: _selectedState,
                   decoration: const InputDecoration(
                     labelText: 'State',
                     prefixIcon: Icon(Icons.map_outlined),
-                    border: OutlineInputBorder(),
+                    fillColor: AppColors.readOnlyFill,
+                    filled: true,
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -270,23 +255,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: Text('California'),
                     ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedState = value;
-                      });
-                    }
-                  },
+                  onChanged: null, // Read-only for default Los Angeles CA location
                 ),
                 const SizedBox(height: 16),
 
-                // City Dropdown
+                // City Dropdown (Styled with read-only fill #E6F0FB)
                 DropdownButtonFormField<String>(
                   value: _selectedCity,
                   decoration: const InputDecoration(
                     labelText: 'City',
                     prefixIcon: Icon(Icons.location_city_outlined),
-                    border: OutlineInputBorder(),
+                    fillColor: AppColors.readOnlyFill,
+                    filled: true,
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -294,27 +274,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: Text('Los Angeles'),
                     ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedCity = value;
-                      });
-                    }
-                  },
+                  onChanged: null, // Read-only for default Los Angeles CA location
                 ),
                 const SizedBox(height: 32),
 
                 // Submit Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleSignUp,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
                   child: _isLoading
                       ? const SizedBox(
                           height: 20,
@@ -324,10 +290,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          'Sign Up',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                      : const Text('Sign Up'),
                 ),
                 const SizedBox(height: 16),
 
@@ -335,7 +298,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Already have an account?'),
+                    Text(
+                      'Already have an account?',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     TextButton(
                       onPressed: () {
                         Navigator.pushReplacement(

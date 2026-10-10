@@ -4,6 +4,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/sign_up_screen.dart';
 import 'services/auth_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   // Ensure Flutter engine bindings are initialized before calling async platform channels.
@@ -39,10 +40,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MAWA - Environmental Intelligence',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.clearSkyTheme,
       home: _getInitialHomeScreen(),
     );
   }

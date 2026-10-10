@@ -159,28 +159,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             // Greeting Header
             Text(
               'Hello, ${widget.userProfile.firstName}!',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
               'Your location-aware environmental safety dashboard.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+              style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
 
             // Location Access Blocked Banner (Displayed when permanently denied)
             if (_isPermanentlyDenied) ...[
               Card(
-                color: Colors.orange.shade50,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.orange.shade300),
-                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -188,37 +178,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.location_off_outlined,
-                              color: Colors.orange.shade800),
+                          Icon(
+                            Icons.location_off_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Location Access Blocked',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade900,
-                                ),
+                            style: Theme.of(context).textTheme.titleSmall,
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Location access is blocked. Please enable location permissions in system settings.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.orange.shade900,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: () async {
                           await _locationService.openAppSettings();
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange.shade700,
-                          foregroundColor: Colors.white,
-                        ),
                         icon: const Icon(Icons.settings_outlined, size: 18),
                         label: const Text('Open App Settings'),
                       ),
@@ -231,10 +211,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
             // Profile Info Card
             Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -242,25 +218,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.person_outline, color: Colors.deepPurple),
+                        Icon(Icons.person_outline,
+                            color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
                           'Account Profile',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ],
                     ),
                     const Divider(height: 20),
                     Row(
                       children: [
-                        const Icon(Icons.badge_outlined, size: 18, color: Colors.grey),
+                        const Icon(Icons.badge_outlined,
+                            size: 18, color: Colors.grey),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             '${widget.userProfile.firstName} ${widget.userProfile.lastName}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
@@ -270,7 +249,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(Icons.email_outlined, size: 18, color: Colors.grey),
+                        const Icon(Icons.email_outlined,
+                            size: 18, color: Colors.grey),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -283,7 +263,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(Icons.location_on_outlined, size: 18, color: Colors.grey),
+                        const Icon(Icons.location_on_outlined,
+                            size: 18, color: Colors.grey),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
