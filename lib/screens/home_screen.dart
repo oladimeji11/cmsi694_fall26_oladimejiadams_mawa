@@ -195,12 +195,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton.icon(
+                      ElevatedButton(
                         onPressed: () async {
                           await _locationService.openAppSettings();
                         },
-                        icon: const Icon(Icons.settings_outlined, size: 18),
-                        label: const Text('Open App Settings'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.settings_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Open App Settings',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
