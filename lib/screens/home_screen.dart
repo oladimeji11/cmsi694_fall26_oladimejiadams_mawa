@@ -5,7 +5,7 @@ import '../services/location_service.dart';
 import 'login_screen.dart';
 
 /// The Home landing screen dashboard displaying user greeting, account profile details,
-/// and managing location permission requests and system settings redirection.
+/// managing location permission requests, and logging GPS coordinates to debug console.
 class HomeScreen extends StatefulWidget {
   final UserProfile userProfile;
   final AuthService authService;
@@ -56,9 +56,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _checkAndRequestLocationPermission() async {
     try {
+      // 1. Check if location services (GPS hardware) are enabled on the device
+      final isGpsEnabled = await _locationService.isLocationServiceEnabled();
+      if (!isGpsEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Location services are disabled. Please enable GPS in device settings.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2. Check current location permission status
       final currentStatus = await _locationService.checkPermission();
 
-      // If permission is already granted, clear permanently denied banner and return
+      // If permission is already granted, clear permanently denied banner and read GPS
       if (_locationService.isGranted(currentStatus)) {
         if (mounted && _isPermanentlyDenied) {
           setState(() {
@@ -75,6 +93,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           setState(() {
             _isPermanentlyDenied = false;
           });
+        }
+
+        // Read GPS coordinates and log to debug console
+        final position = await _locationService.getCurrentPosition();
+        if (position != null) {
+          debugPrint(
+            'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
+          );
         }
         return;
       }
@@ -105,6 +131,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             duration: Duration(seconds: 3),
           ),
         );
+
+        // Read GPS coordinates and log to debug console
+        final position = await _locationService.getCurrentPosition();
+        if (position != null) {
+          debugPrint(
+            'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
+          );
+        }
       } else if (_locationService.isPermanentlyDenied(requestedStatus)) {
         setState(() {
           _isPermanentlyDenied = true;

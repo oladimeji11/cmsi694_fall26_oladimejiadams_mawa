@@ -10,18 +10,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeLocationService extends LocationService {
   LocationPermission currentStatus;
   LocationPermission requestStatus;
+  bool gpsEnabled;
   bool openSettingsCalled = false;
+  bool getCurrentPositionCalled = false;
 
   FakeLocationService({
     this.currentStatus = LocationPermission.denied,
     this.requestStatus = LocationPermission.whileInUse,
+    this.gpsEnabled = true,
   });
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => gpsEnabled;
 
   @override
   Future<LocationPermission> checkPermission() async => currentStatus;
 
   @override
   Future<LocationPermission> requestPermission() async => requestStatus;
+
+  @override
+  Future<Position?> getCurrentPosition() async {
+    getCurrentPositionCalled = true;
+    if (!gpsEnabled || !isGranted(currentStatus)) {
+      return null;
+    }
+    return Position(
+      longitude: -118.2437,
+      latitude: 34.0522,
+      timestamp: DateTime.now(),
+      accuracy: 10.0,
+      altitude: 0.0,
+      altitudeAccuracy: 0.0,
+      heading: 0.0,
+      headingAccuracy: 0.0,
+      speed: 0.0,
+      speedAccuracy: 0.0,
+    );
+  }
 
   @override
   Future<bool> openAppSettings() async {
@@ -86,6 +112,31 @@ void main() {
     expect(find.text('Jane Doe'), findsOneWidget);
     expect(find.text('jane.doe@example.com'), findsOneWidget);
     expect(find.text('Los Angeles, California, US'), findsOneWidget);
+    expect(fakeLocationService.getCurrentPositionCalled, true);
+  });
+
+  testWidgets('HomeScreen shows SnackBar when location services are disabled on device',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      gpsEnabled: false,
+    );
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Location services are disabled. Please enable GPS in device settings.'),
+      findsOneWidget,
+    );
+    expect(fakeLocationService.getCurrentPositionCalled, false);
   });
 
   testWidgets('HomeScreen shows success SnackBar when location permission is granted',
@@ -107,6 +158,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Location permission granted.'), findsOneWidget);
+    expect(fakeLocationService.getCurrentPositionCalled, true);
   });
 
   testWidgets('HomeScreen shows explanatory SnackBar when location permission is denied',
