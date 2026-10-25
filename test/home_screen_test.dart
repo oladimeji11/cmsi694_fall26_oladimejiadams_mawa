@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mawa_app/models/user_profile.dart';
 import 'package:mawa_app/screens/home_screen.dart';
@@ -13,11 +14,13 @@ class FakeLocationService extends LocationService {
   bool gpsEnabled;
   bool openSettingsCalled = false;
   bool getCurrentPositionCalled = false;
+  Placemark? mockPlacemark;
 
   FakeLocationService({
     this.currentStatus = LocationPermission.denied,
     this.requestStatus = LocationPermission.whileInUse,
     this.gpsEnabled = true,
+    this.mockPlacemark,
   });
 
   @override
@@ -47,6 +50,12 @@ class FakeLocationService extends LocationService {
       speed: 0.0,
       speedAccuracy: 0.0,
     );
+  }
+
+  @override
+  Future<Placemark?> getPlacemarkFromCoordinates(
+      double latitude, double longitude) async {
+    return mockPlacemark;
   }
 
   @override
@@ -113,6 +122,32 @@ void main() {
     expect(find.text('jane.doe@example.com'), findsOneWidget);
     expect(find.text('Los Angeles, California, US'), findsOneWidget);
     expect(fakeLocationService.getCurrentPositionCalled, true);
+  });
+
+  testWidgets('HomeScreen displays exact street address, city, state, and zip code from reverse-geocoding',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      currentStatus: LocationPermission.whileInUse,
+      mockPlacemark: Placemark(
+        street: '1 LMU Drive',
+        locality: 'Los Angeles',
+        administrativeArea: 'CA',
+        postalCode: '90045',
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 LMU Drive, Los Angeles, CA, 90045'), findsOneWidget);
   });
 
   testWidgets('HomeScreen shows SnackBar when location services are disabled on device',

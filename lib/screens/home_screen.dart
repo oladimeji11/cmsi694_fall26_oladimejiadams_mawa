@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import 'login_screen.dart';
 
 /// The Home landing screen dashboard displaying user greeting, account profile details,
-/// managing location permission requests, and logging GPS coordinates to debug console.
+/// managing location permission requests, logging GPS coordinates, and displaying exact reverse-geocoded street addresses.
 class HomeScreen extends StatefulWidget {
   final UserProfile userProfile;
   final AuthService authService;
@@ -25,6 +26,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final LocationService _locationService;
   bool _isPermanentlyDenied = false;
+  String? _geocodedAddress;
 
   @override
   void initState() {
@@ -51,6 +53,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Re-check location permission when returning from System Settings to the app foreground
     if (state == AppLifecycleState.resumed) {
       _checkAndRequestLocationPermission();
+    }
+  }
+
+  Future<void> _fetchAndReverseGeocodeLocation(Position position) async {
+    debugPrint(
+      'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
+    );
+
+    try {
+      final placemark = await _locationService.getPlacemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (mounted && placemark != null) {
+        final subThoroughfare = placemark.subThoroughfare ?? '';
+        final thoroughfare = placemark.thoroughfare ?? placemark.street ?? '';
+        
+        final street = (subThoroughfare.isNotEmpty && !thoroughfare.contains(subThoroughfare))
+            ? '$subThoroughfare $thoroughfare'
+            : thoroughfare;
+
+        final city = placemark.locality ?? placemark.subAdministrativeArea ?? widget.userProfile.city;
+        final state = placemark.administrativeArea ?? widget.userProfile.state;
+        final postalCode = placemark.postalCode ?? '';
+
+        final formattedParts = [
+          if (street.isNotEmpty) street,
+          if (city.isNotEmpty) city,
+          if (state.isNotEmpty) state,
+          if (postalCode.isNotEmpty) postalCode,
+        ];
+
+        if (formattedParts.isNotEmpty) {
+          final exactAddress = formattedParts.join(', ');
+          debugPrint('MAWA Exact Address Obtained: $exactAddress');
+          setState(() {
+            _geocodedAddress = exactAddress;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('MAWA Reverse Geocoding Exception: $e');
+      // Fallback gracefully to default profile location on geocoding error
     }
   }
 
@@ -95,12 +141,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Read GPS coordinates and log to debug console
+        // Read GPS coordinates and reverse-geocode address
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
-          debugPrint(
-            'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
-          );
+          await _fetchAndReverseGeocodeLocation(position);
         }
         return;
       }
@@ -132,12 +176,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
 
-        // Read GPS coordinates and log to debug console
+        // Read GPS coordinates and reverse-geocode address
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
-          debugPrint(
-            'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
-          );
+          await _fetchAndReverseGeocodeLocation(position);
         }
       } else if (_locationService.isPermanentlyDenied(requestedStatus)) {
         setState(() {
@@ -318,7 +360,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${widget.userProfile.city}, ${widget.userProfile.state}, ${widget.userProfile.country}',
+                            _geocodedAddress ??
+                                '${widget.userProfile.city}, ${widget.userProfile.state}, ${widget.userProfile.country}',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
