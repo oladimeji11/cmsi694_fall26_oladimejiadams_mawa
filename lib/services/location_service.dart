@@ -1,7 +1,8 @@
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
-/// Service for requesting location permission and reading the device's
-/// GPS coordinates via Geolocator.
+/// Service for requesting location permission, reading GPS coordinates,
+/// and reverse-geocoding coordinates to street addresses.
 class LocationService {
   /// Checks the current location permission status without prompting.
   Future<LocationPermission> checkPermission() async {
@@ -43,6 +44,20 @@ class LocationService {
       );
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Reverse-geocodes GPS coordinates into a human-readable Placemark (street, city, state, postal code).
+  Future<Placemark?> getPlacemarkFromCoordinates(
+      double latitude, double longitude) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty) {
+        return placemarks.first;
+      }
+      return null;
+    } catch (_) {
+      return null; // Graceful fallback on network/geocoding error
     }
   }
 

@@ -68,19 +68,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
 
       if (mounted && placemark != null) {
+        debugPrint(
+          'MAWA Raw Placemark: name=${placemark.name}, street=${placemark.street}, thoroughfare=${placemark.thoroughfare}, subThoroughfare=${placemark.subThoroughfare}, subLocality=${placemark.subLocality}, locality=${placemark.locality}, postalCode=${placemark.postalCode}',
+        );
+
         final subThoroughfare = placemark.subThoroughfare ?? '';
         final thoroughfare = placemark.thoroughfare ?? placemark.street ?? '';
-        
-        final street = (subThoroughfare.isNotEmpty && !thoroughfare.contains(subThoroughfare))
+        final name = (placemark.name != null &&
+                placemark.name != placemark.locality &&
+                placemark.name != placemark.subAdministrativeArea &&
+                placemark.name != placemark.country)
+            ? placemark.name!
+            : '';
+
+        String street = (subThoroughfare.isNotEmpty &&
+                !thoroughfare.contains(subThoroughfare))
             ? '$subThoroughfare $thoroughfare'
             : thoroughfare;
 
-        final city = placemark.locality ?? placemark.subAdministrativeArea ?? widget.userProfile.city;
+        if (street.isEmpty && name.isNotEmpty) {
+          street = name;
+        }
+
+        final subLocality = (placemark.subLocality != null &&
+                placemark.subLocality != placemark.locality)
+            ? placemark.subLocality!
+            : '';
+        final city = placemark.locality ??
+            placemark.subAdministrativeArea ??
+            widget.userProfile.city;
         final state = placemark.administrativeArea ?? widget.userProfile.state;
         final postalCode = placemark.postalCode ?? '';
 
         final formattedParts = [
           if (street.isNotEmpty) street,
+          if (subLocality.isNotEmpty) subLocality,
           if (city.isNotEmpty) city,
           if (state.isNotEmpty) state,
           if (postalCode.isNotEmpty) postalCode,
