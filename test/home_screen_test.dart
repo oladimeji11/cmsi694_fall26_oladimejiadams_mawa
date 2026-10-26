@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mawa_app/models/user_profile.dart';
+import 'package:mawa_app/models/weather_info.dart';
 import 'package:mawa_app/screens/home_screen.dart';
 import 'package:mawa_app/services/auth_service.dart';
 import 'package:mawa_app/services/location_service.dart';
+import 'package:mawa_app/services/weather_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeLocationService extends LocationService {
@@ -65,6 +67,33 @@ class FakeLocationService extends LocationService {
   }
 }
 
+class FakeWeatherService extends WeatherService {
+  final WeatherInfo? mockWeatherInfo;
+  final bool shouldFail;
+
+  FakeWeatherService({
+    this.mockWeatherInfo,
+    this.shouldFail = false,
+  });
+
+  @override
+  Future<WeatherInfo> fetchCurrentWeather(double latitude, double longitude) async {
+    if (shouldFail) {
+      throw Exception('Unable to fetch weather');
+    }
+    return mockWeatherInfo ??
+        const WeatherInfo(
+          temperature: 72,
+          temperatureUnit: 'F',
+          shortForecast: 'Sunny',
+          windSpeed: '7 mph',
+          windDirection: 'SW',
+          humidity: 45,
+          precipitationChance: 20,
+        );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -97,6 +126,7 @@ void main() {
     final fakeLocationService = FakeLocationService(
       currentStatus: LocationPermission.whileInUse,
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -104,6 +134,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );
@@ -124,6 +155,65 @@ void main() {
     expect(fakeLocationService.getCurrentPositionCalled, true);
   });
 
+  testWidgets('HomeScreen renders Weather Card with temperature, condition, wind, humidity, precipitation',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      currentStatus: LocationPermission.whileInUse,
+    );
+    final fakeWeatherService = FakeWeatherService(
+      mockWeatherInfo: const WeatherInfo(
+        temperature: 75,
+        temperatureUnit: 'F',
+        shortForecast: 'Partly Cloudy',
+        windSpeed: '8 mph',
+        windDirection: 'NW',
+        humidity: 50,
+        precipitationChance: 10,
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current Weather'), findsOneWidget);
+    expect(find.text('75°F'), findsOneWidget);
+    expect(find.text('Partly Cloudy'), findsOneWidget);
+    expect(find.text('8 mph NW'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('10%'), findsOneWidget);
+  });
+
+  testWidgets('HomeScreen renders error message when weather API fails',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      currentStatus: LocationPermission.whileInUse,
+    );
+    final fakeWeatherService = FakeWeatherService(shouldFail: true);
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unable to fetch weather'), findsOneWidget);
+  });
+
   testWidgets('HomeScreen displays exact street address, city, state, and zip code from reverse-geocoding',
       (WidgetTester tester) async {
     final fakeLocationService = FakeLocationService(
@@ -135,6 +225,7 @@ void main() {
         postalCode: '90045',
       ),
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -142,6 +233,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );
@@ -155,6 +247,7 @@ void main() {
     final fakeLocationService = FakeLocationService(
       gpsEnabled: false,
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -162,6 +255,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );
@@ -180,6 +274,7 @@ void main() {
       currentStatus: LocationPermission.denied,
       requestStatus: LocationPermission.whileInUse,
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -187,6 +282,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );
@@ -202,6 +298,7 @@ void main() {
       currentStatus: LocationPermission.denied,
       requestStatus: LocationPermission.denied,
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -209,6 +306,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );
@@ -225,6 +323,7 @@ void main() {
     final fakeLocationService = FakeLocationService(
       currentStatus: LocationPermission.deniedForever,
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -232,6 +331,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );
@@ -257,6 +357,7 @@ void main() {
     final fakeLocationService = FakeLocationService(
       currentStatus: LocationPermission.whileInUse,
     );
+    final fakeWeatherService = FakeWeatherService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -264,6 +365,7 @@ void main() {
           userProfile: testProfile,
           authService: authService,
           locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
         ),
       ),
     );

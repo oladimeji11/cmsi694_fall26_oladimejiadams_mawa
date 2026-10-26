@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/user_profile.dart';
+import '../models/weather_info.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
+import '../services/weather_service.dart';
 import 'login_screen.dart';
 
-/// The Home landing screen dashboard displaying user greeting, account profile details,
-/// managing location permission requests, logging GPS coordinates, and displaying exact reverse-geocoded street addresses.
+/// The Home landing screen dashboard displaying user greeting, current weather metrics,
+/// account profile details, and location permission management.
 class HomeScreen extends StatefulWidget {
   final UserProfile userProfile;
   final AuthService authService;
   final LocationService? locationService;
+  final WeatherService? weatherService;
 
   const HomeScreen({
     super.key,
     required this.userProfile,
     required this.authService,
     this.locationService,
+    this.weatherService,
   });
 
   @override
@@ -25,18 +29,25 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final LocationService _locationService;
+  late final WeatherService _weatherService;
+
   bool _isPermanentlyDenied = false;
   String? _geocodedAddress;
+
+  WeatherInfo? _weatherInfo;
+  bool _isWeatherLoading = false;
+  String? _weatherError;
 
   @override
   void initState() {
     super.initState();
     _locationService = widget.locationService ?? LocationService();
+    _weatherService = widget.weatherService ?? WeatherService();
 
     // Register lifecycle observer to listen for app resume events
     WidgetsBinding.instance.addObserver(this);
 
-    // Trigger location permission check after the first frame renders
+    // Trigger location permission check and weather fetch after the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestLocationPermission();
     });
@@ -56,10 +67,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _fetchWeather(double latitude, double longitude) async {
+    setState(() {
+      _isWeatherLoading = true;
+      _weatherError = null;
+    });
+
+    try {
+      final info = await _weatherService.fetchCurrentWeather(latitude, longitude);
+      if (mounted) {
+        setState(() {
+          _weatherInfo = info;
+          _isWeatherLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _weatherError = 'Unable to fetch weather';
+          _isWeatherLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchAndReverseGeocodeLocation(Position position) async {
     debugPrint(
       'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
     );
+
+    // Trigger NWS 2-Step Weather API fetch
+    _fetchWeather(position.latitude, position.longitude);
 
     try {
       final placemark = await _locationService.getPlacemarkFromCoordinates(
@@ -68,10 +106,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
 
       if (mounted && placemark != null) {
-        debugPrint(
-          'MAWA Raw Placemark: name=${placemark.name}, street=${placemark.street}, thoroughfare=${placemark.thoroughfare}, subThoroughfare=${placemark.subThoroughfare}, subLocality=${placemark.subLocality}, locality=${placemark.locality}, postalCode=${placemark.postalCode}',
-        );
-
         final subThoroughfare = placemark.subThoroughfare ?? '';
         final thoroughfare = placemark.thoroughfare ?? placemark.street ?? '';
         final name = (placemark.name != null &&
@@ -118,7 +152,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('MAWA Reverse Geocoding Exception: $e');
-      // Fallback gracefully to default profile location on geocoding error
     }
   }
 
@@ -163,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Read GPS coordinates and reverse-geocode address
+        // Read GPS coordinates and fetch weather/address
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
           await _fetchAndReverseGeocodeLocation(position);
@@ -198,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
 
-        // Read GPS coordinates and reverse-geocode address
+        // Read GPS coordinates and fetch weather/address
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
           await _fetchAndReverseGeocodeLocation(position);
@@ -322,6 +355,129 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 24),
             ],
+
+            // Current Weather Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.thermostat_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Current Weather',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        if (_isWeatherLoading)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    if (_isWeatherLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.0),
+                        child: Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_weatherError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                        child: Text(
+                          _weatherError!,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.orange.shade800,
+                              ),
+                        ),
+                      )
+                    else if (_weatherInfo != null) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '${_weatherInfo!.temperature}°${_weatherInfo!.temperatureUnit}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _weatherInfo!.shortForecast,
+                              style: Theme.of(context).textTheme.titleMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.air_outlined,
+                                  size: 16, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${_weatherInfo!.windSpeed} ${_weatherInfo!.windDirection}'
+                                    .trim(),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                          if (_weatherInfo!.humidity != null)
+                            Row(
+                              children: [
+                                const Icon(Icons.water_drop_outlined,
+                                    size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_weatherInfo!.humidity}%',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          if (_weatherInfo!.precipitationChance != null)
+                            Row(
+                              children: [
+                                const Icon(Icons.umbrella_outlined,
+                                    size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_weatherInfo!.precipitationChance}%',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Profile Info Card
             Card(
