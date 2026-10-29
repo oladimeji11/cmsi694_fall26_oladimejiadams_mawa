@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/weather_alert.dart';
 import '../models/weather_info.dart';
 
-/// Service responsible for fetching weather metrics from the National Weather Service (NWS) API.
+/// Service responsible for fetching weather metrics and active alerts from the National Weather Service (NWS) API.
 class WeatherService {
   static const Map<String, String> _headers = {
     'User-Agent': '(MAWA Environmental App, contact@mawa.edu)',
@@ -63,6 +64,42 @@ class WeatherService {
     } catch (e) {
       debugPrint('MAWA NWS Weather API Error: $e');
       throw Exception('Unable to fetch weather');
+    }
+  }
+
+  /// Fetches active weather alerts for the given GPS latitude and longitude from the NWS Alerts API.
+  Future<List<WeatherAlert>> fetchActiveAlerts(
+      double latitude, double longitude) async {
+    try {
+      final alertsUrl = Uri.parse(
+        'https://api.weather.gov/alerts/active?point=${latitude.toStringAsFixed(4)},${longitude.toStringAsFixed(4)}',
+      );
+
+      final response = await _client.get(alertsUrl, headers: _headers).timeout(
+            const Duration(seconds: 10),
+          );
+
+      if (response.statusCode != 200) {
+        throw const FormatException('Unable to fetch active alerts');
+      }
+
+      final jsonMap = json.decode(response.body) as Map<String, dynamic>;
+      final features = jsonMap['features'] as List<dynamic>?;
+
+      if (features == null || features.isEmpty) {
+        return [];
+      }
+
+      return features
+          .map((f) => WeatherAlert.fromNwsJson(f as Map<String, dynamic>))
+          .toList();
+    } on SocketException catch (_) {
+      throw Exception('Unable to fetch active alerts');
+    } on http.ClientException catch (_) {
+      throw Exception('Unable to fetch active alerts');
+    } catch (e) {
+      debugPrint('MAWA NWS Active Alerts API Error: $e');
+      throw Exception('Unable to fetch active alerts');
     }
   }
 }

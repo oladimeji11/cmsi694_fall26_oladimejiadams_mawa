@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/user_profile.dart';
+import '../models/weather_alert.dart';
 import '../models/weather_info.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
@@ -8,7 +9,7 @@ import '../services/weather_service.dart';
 import 'login_screen.dart';
 
 /// The Home landing screen dashboard displaying user greeting, current weather metrics,
-/// account profile details, and location permission management.
+/// active weather alerts, account profile details, and location permission management.
 class HomeScreen extends StatefulWidget {
   final UserProfile userProfile;
   final AuthService authService;
@@ -38,6 +39,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isWeatherLoading = false;
   String? _weatherError;
 
+  List<WeatherAlert> _activeAlerts = [];
+  bool _isAlertsLoading = false;
+  String? _alertsError;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Register lifecycle observer to listen for app resume events
     WidgetsBinding.instance.addObserver(this);
 
-    // Trigger location permission check and weather fetch after the first frame renders
+    // Trigger location permission check, weather, and alerts fetch after the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestLocationPermission();
     });
@@ -91,13 +96,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _fetchAlerts(double latitude, double longitude) async {
+    setState(() {
+      _isAlertsLoading = true;
+      _alertsError = null;
+    });
+
+    try {
+      final alerts = await _weatherService.fetchActiveAlerts(latitude, longitude);
+      if (mounted) {
+        setState(() {
+          _activeAlerts = alerts;
+          _isAlertsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _alertsError = 'Unable to fetch active alerts';
+          _isAlertsLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchAndReverseGeocodeLocation(Position position) async {
     debugPrint(
       'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
     );
 
-    // Trigger NWS 2-Step Weather API fetch
+    // Trigger NWS 2-Step Weather API & Active Alerts fetches
     _fetchWeather(position.latitude, position.longitude);
+    _fetchAlerts(position.latitude, position.longitude);
 
     try {
       final placemark = await _locationService.getPlacemarkFromCoordinates(
@@ -196,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Read GPS coordinates and fetch weather/address
+        // Read GPS coordinates and fetch weather/address/alerts
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
           await _fetchAndReverseGeocodeLocation(position);
@@ -231,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
 
-        // Read GPS coordinates and fetch weather/address
+        // Read GPS coordinates and fetch weather/address/alerts
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
           await _fetchAndReverseGeocodeLocation(position);
@@ -257,6 +287,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (_) {
       // Gracefully handle any platform permission errors without crashing the app
     }
+  }
+
+  Widget _buildBadge(String text, {Color? backgroundColor, Color? textColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? const Color(0xFFE6F0FB),
+        borderRadius: BorderRadius.circular(6.0),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.0,
+          fontWeight: FontWeight.w600,
+          color: textColor ?? Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
   }
 
   @override
@@ -473,6 +521,152 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ],
                       ),
                     ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Active Weather Alerts Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.orange.shade800,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Active Weather Alerts',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        if (_isAlertsLoading)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    if (_isAlertsLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.0),
+                        child: Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_alertsError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                        child: Text(
+                          _alertsError!,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.orange.shade800,
+                              ),
+                        ),
+                      )
+                    else if (_activeAlerts.isEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: Colors.green.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No active alerts for your area',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _activeAlerts.length,
+                        separatorBuilder: (_, __) => const Divider(height: 24),
+                        itemBuilder: (context, index) {
+                          final alert = _activeAlerts[index];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Badges Row: "City-wide" & "for your information"
+                              Row(
+                                children: [
+                                  _buildBadge(
+                                    'City-wide',
+                                    backgroundColor: const Color(0xFFE6F0FB),
+                                    textColor:
+                                        Theme.of(context).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildBadge(
+                                    'for your information',
+                                    backgroundColor: const Color(0xFFF4F9FF),
+                                    textColor: const Color(0xFF5B7A99),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      alert.event,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ),
+                                  _buildBadge(
+                                    alert.severity,
+                                    backgroundColor: Colors.orange.shade100,
+                                    textColor: Colors.orange.shade900,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Area: ${alert.areaDesc}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (alert.expires != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Expires: ${alert.expires!.toLocal()}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Colors.grey.shade600,
+                                      ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),

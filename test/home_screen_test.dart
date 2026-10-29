@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mawa_app/models/user_profile.dart';
+import 'package:mawa_app/models/weather_alert.dart';
 import 'package:mawa_app/models/weather_info.dart';
 import 'package:mawa_app/screens/home_screen.dart';
 import 'package:mawa_app/services/auth_service.dart';
@@ -69,10 +70,12 @@ class FakeLocationService extends LocationService {
 
 class FakeWeatherService extends WeatherService {
   final WeatherInfo? mockWeatherInfo;
+  final List<WeatherAlert>? mockAlerts;
   final bool shouldFail;
 
   FakeWeatherService({
     this.mockWeatherInfo,
+    this.mockAlerts,
     this.shouldFail = false,
   });
 
@@ -91,6 +94,15 @@ class FakeWeatherService extends WeatherService {
           humidity: 45,
           precipitationChance: 20,
         );
+  }
+
+  @override
+  Future<List<WeatherAlert>> fetchActiveAlerts(
+      double latitude, double longitude) async {
+    if (shouldFail) {
+      throw Exception('Unable to fetch active alerts');
+    }
+    return mockAlerts ?? [];
   }
 }
 
@@ -192,6 +204,64 @@ void main() {
     expect(find.text('10%'), findsOneWidget);
   });
 
+  testWidgets('HomeScreen renders Active Weather Alerts Card with No active alerts message when empty',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      currentStatus: LocationPermission.whileInUse,
+    );
+    final fakeWeatherService = FakeWeatherService(mockAlerts: []);
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active Weather Alerts'), findsOneWidget);
+    expect(find.text('No active alerts for your area'), findsOneWidget);
+  });
+
+  testWidgets('HomeScreen renders Active Weather Alerts Card with City-wide and for your information badges when alerts exist',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      currentStatus: LocationPermission.whileInUse,
+    );
+    final fakeWeatherService = FakeWeatherService(
+      mockAlerts: [
+        const WeatherAlert(
+          event: 'Excessive Heat Warning',
+          severity: 'Extreme',
+          areaDesc: 'Los Angeles County Coast',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active Weather Alerts'), findsOneWidget);
+    expect(find.text('City-wide'), findsOneWidget);
+    expect(find.text('for your information'), findsOneWidget);
+    expect(find.text('Excessive Heat Warning'), findsOneWidget);
+    expect(find.text('Extreme'), findsOneWidget);
+    expect(find.text('Area: Los Angeles County Coast'), findsOneWidget);
+  });
+
   testWidgets('HomeScreen renders error message when weather API fails',
       (WidgetTester tester) async {
     final fakeLocationService = FakeLocationService(
@@ -212,6 +282,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unable to fetch weather'), findsOneWidget);
+    expect(find.text('Unable to fetch active alerts'), findsOneWidget);
   });
 
   testWidgets('HomeScreen displays exact street address, city, state, and zip code from reverse-geocoding',
