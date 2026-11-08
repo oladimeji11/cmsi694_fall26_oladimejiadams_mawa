@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:mawa_app/models/earthquake.dart';
 import 'package:mawa_app/models/user_profile.dart';
 import 'package:mawa_app/models/weather_alert.dart';
 import 'package:mawa_app/models/weather_info.dart';
 import 'package:mawa_app/screens/home_screen.dart';
 import 'package:mawa_app/services/auth_service.dart';
+import 'package:mawa_app/services/earthquake_service.dart';
 import 'package:mawa_app/services/location_service.dart';
 import 'package:mawa_app/services/weather_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -106,6 +108,25 @@ class FakeWeatherService extends WeatherService {
   }
 }
 
+class FakeEarthquakeService extends EarthquakeService {
+  final List<Earthquake>? mockEarthquakes;
+  final bool shouldFail;
+
+  FakeEarthquakeService({
+    this.mockEarthquakes,
+    this.shouldFail = false,
+  });
+
+  @override
+  Future<List<Earthquake>> fetchRecentEarthquakes(
+      double latitude, double longitude) async {
+    if (shouldFail) {
+      throw Exception('Unable to fetch earthquake data');
+    }
+    return mockEarthquakes ?? [];
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -139,6 +160,7 @@ void main() {
       currentStatus: LocationPermission.whileInUse,
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -147,6 +169,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -183,6 +206,7 @@ void main() {
         precipitationChance: 10,
       ),
     );
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -191,6 +215,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -210,6 +235,7 @@ void main() {
       currentStatus: LocationPermission.whileInUse,
     );
     final fakeWeatherService = FakeWeatherService(mockAlerts: []);
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -218,6 +244,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -227,17 +254,48 @@ void main() {
     expect(find.text('No active alerts for your area'), findsOneWidget);
   });
 
-  testWidgets('HomeScreen renders Active Weather Alerts Card with City-wide and for your information badges when alerts exist',
+  testWidgets('HomeScreen renders Recent Earthquakes Card with No recent earthquakes message when empty',
       (WidgetTester tester) async {
     final fakeLocationService = FakeLocationService(
       currentStatus: LocationPermission.whileInUse,
     );
-    final fakeWeatherService = FakeWeatherService(
-      mockAlerts: [
-        const WeatherAlert(
-          event: 'Excessive Heat Warning',
-          severity: 'Extreme',
-          areaDesc: 'Los Angeles County Coast',
+    final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService(mockEarthquakes: []);
+
+    await tester.pumpWidget(
+      buildTestableWidget(
+        HomeScreen(
+          userProfile: testProfile,
+          authService: authService,
+          locationService: fakeLocationService,
+          weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recent Earthquakes'), findsOneWidget);
+    expect(find.text('No recent earthquakes near you'), findsOneWidget);
+  });
+
+  testWidgets('HomeScreen renders Recent Earthquakes Card with Here ring badge when quakes exist',
+      (WidgetTester tester) async {
+    final fakeLocationService = FakeLocationService(
+      currentStatus: LocationPermission.whileInUse,
+    );
+    final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService(
+      mockEarthquakes: [
+        Earthquake(
+          magnitude: 3.2,
+          place: '4 km CA of Beverly Hills, CA',
+          time: DateTime(2026, 10, 28, 14, 15),
+          latitude: 34.07,
+          longitude: -118.40,
+          depth: 8.5,
+          distanceKm: 1.8,
+          ringTag: 'Here',
         ),
       ],
     );
@@ -249,25 +307,26 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Active Weather Alerts'), findsOneWidget);
-    expect(find.text('City-wide'), findsOneWidget);
-    expect(find.text('for your information'), findsOneWidget);
-    expect(find.text('Excessive Heat Warning'), findsOneWidget);
-    expect(find.text('Extreme'), findsOneWidget);
-    expect(find.text('Area: Los Angeles County Coast'), findsOneWidget);
+    expect(find.text('Recent Earthquakes'), findsOneWidget);
+    expect(find.text('Here'), findsOneWidget);
+    expect(find.text('M 3.2'), findsOneWidget);
+    expect(find.text('1.8 km away'), findsOneWidget);
+    expect(find.text('4 km CA of Beverly Hills, CA'), findsOneWidget);
   });
 
-  testWidgets('HomeScreen renders error message when weather API fails',
+  testWidgets('HomeScreen renders error message when earthquake API fails',
       (WidgetTester tester) async {
     final fakeLocationService = FakeLocationService(
       currentStatus: LocationPermission.whileInUse,
     );
-    final fakeWeatherService = FakeWeatherService(shouldFail: true);
+    final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService(shouldFail: true);
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -276,13 +335,13 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Unable to fetch weather'), findsOneWidget);
-    expect(find.text('Unable to fetch active alerts'), findsOneWidget);
+    expect(find.text('Unable to fetch earthquake data'), findsOneWidget);
   });
 
   testWidgets('HomeScreen displays exact street address, city, state, and zip code from reverse-geocoding',
@@ -297,6 +356,7 @@ void main() {
       ),
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -305,6 +365,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -319,6 +380,7 @@ void main() {
       gpsEnabled: false,
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -327,6 +389,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -346,6 +409,7 @@ void main() {
       requestStatus: LocationPermission.whileInUse,
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -354,6 +418,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -370,6 +435,7 @@ void main() {
       requestStatus: LocationPermission.denied,
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -378,6 +444,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -395,6 +462,7 @@ void main() {
       currentStatus: LocationPermission.deniedForever,
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -403,6 +471,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );
@@ -429,6 +498,7 @@ void main() {
       currentStatus: LocationPermission.whileInUse,
     );
     final fakeWeatherService = FakeWeatherService();
+    final fakeEarthquakeService = FakeEarthquakeService();
 
     await tester.pumpWidget(
       buildTestableWidget(
@@ -437,6 +507,7 @@ void main() {
           authService: authService,
           locationService: fakeLocationService,
           weatherService: fakeWeatherService,
+          earthquakeService: fakeEarthquakeService,
         ),
       ),
     );

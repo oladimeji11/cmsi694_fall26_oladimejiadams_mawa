@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import '../models/earthquake.dart';
 import '../models/user_profile.dart';
 import '../models/weather_alert.dart';
 import '../models/weather_info.dart';
 import '../services/auth_service.dart';
+import '../services/earthquake_service.dart';
 import '../services/location_service.dart';
 import '../services/weather_service.dart';
 import 'login_screen.dart';
 
 /// The Home landing screen dashboard displaying user greeting, current weather metrics,
-/// active weather alerts, account profile details, and location permission management.
+/// active weather alerts, recent earthquakes grouped by ring distance, account profile details, and location permission management.
 class HomeScreen extends StatefulWidget {
   final UserProfile userProfile;
   final AuthService authService;
   final LocationService? locationService;
   final WeatherService? weatherService;
+  final EarthquakeService? earthquakeService;
 
   const HomeScreen({
     super.key,
@@ -22,6 +25,7 @@ class HomeScreen extends StatefulWidget {
     required this.authService,
     this.locationService,
     this.weatherService,
+    this.earthquakeService,
   });
 
   @override
@@ -31,6 +35,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final LocationService _locationService;
   late final WeatherService _weatherService;
+  late final EarthquakeService _earthquakeService;
 
   bool _isPermanentlyDenied = false;
   String? _geocodedAddress;
@@ -43,16 +48,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isAlertsLoading = false;
   String? _alertsError;
 
+  List<Earthquake> _earthquakes = [];
+  bool _isEarthquakesLoading = false;
+  String? _earthquakesError;
+
   @override
   void initState() {
     super.initState();
     _locationService = widget.locationService ?? LocationService();
     _weatherService = widget.weatherService ?? WeatherService();
+    _earthquakeService = widget.earthquakeService ?? EarthquakeService();
 
     // Register lifecycle observer to listen for app resume events
     WidgetsBinding.instance.addObserver(this);
 
-    // Trigger location permission check, weather, and alerts fetch after the first frame renders
+    // Trigger location permission check, weather, alerts, and earthquake fetch after the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRequestLocationPermission();
     });
@@ -120,14 +130,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _fetchEarthquakes(double latitude, double longitude) async {
+    setState(() {
+      _isEarthquakesLoading = true;
+      _earthquakesError = null;
+    });
+
+    try {
+      final quakes = await _earthquakeService.fetchRecentEarthquakes(latitude, longitude);
+      if (mounted) {
+        setState(() {
+          _earthquakes = quakes;
+          _isEarthquakesLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _earthquakesError = 'Unable to fetch earthquake data';
+          _isEarthquakesLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchAndReverseGeocodeLocation(Position position) async {
     debugPrint(
       'MAWA GPS Location: Latitude ${position.latitude}, Longitude ${position.longitude}',
     );
 
-    // Trigger NWS 2-Step Weather API & Active Alerts fetches
+    // Trigger NWS Weather API, Active Alerts, and USGS Earthquake fetches
     _fetchWeather(position.latitude, position.longitude);
     _fetchAlerts(position.latitude, position.longitude);
+    _fetchEarthquakes(position.latitude, position.longitude);
 
     try {
       final placemark = await _locationService.getPlacemarkFromCoordinates(
@@ -226,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Read GPS coordinates and fetch weather/address/alerts
+        // Read GPS coordinates and fetch weather/address/alerts/earthquakes
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
           await _fetchAndReverseGeocodeLocation(position);
@@ -261,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
 
-        // Read GPS coordinates and fetch weather/address/alerts
+        // Read GPS coordinates and fetch weather/address/alerts/earthquakes
         final position = await _locationService.getCurrentPosition();
         if (position != null) {
           await _fetchAndReverseGeocodeLocation(position);
@@ -305,6 +340,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  Widget _buildRingBadge(String ringTag) {
+    Color bg;
+    Color text;
+    if (ringTag == 'Here') {
+      bg = const Color(0xFFFFEBEE);
+      text = const Color(0xFFD32F2F);
+    } else if (ringTag == 'Nearby') {
+      bg = const Color(0xFFFFF3E0);
+      text = const Color(0xFFE65100);
+    } else {
+      bg = const Color(0xFFE6F0FB);
+      text = Theme.of(context).colorScheme.primary;
+    }
+    return _buildBadge(ringTag, backgroundColor: bg, textColor: text);
   }
 
   @override
@@ -604,7 +655,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Badges Row: "City-wide" & "for your information"
                               Row(
                                 children: [
                                   _buildBadge(
@@ -663,6 +713,143 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       ),
                                 ),
                               ],
+                            ],
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Recent Earthquakes Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.radar_outlined,
+                              color: Colors.deepOrange.shade800,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Recent Earthquakes',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        if (_isEarthquakesLoading)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    if (_isEarthquakesLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.0),
+                        child: Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_earthquakesError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                        child: Text(
+                          _earthquakesError!,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.orange.shade800,
+                              ),
+                        ),
+                      )
+                    else if (_earthquakes.isEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: Colors.green.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No recent earthquakes near you',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _earthquakes.length,
+                        separatorBuilder: (_, __) => const Divider(height: 20),
+                        itemBuilder: (context, index) {
+                          final quake = _earthquakes[index];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      _buildRingBadge(quake.ringTag),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'M ${quake.magnitude.toStringAsFixed(1)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '${quake.distanceKm.toStringAsFixed(1)} km away',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                quake.place,
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${quake.time.month}/${quake.time.day}/${quake.time.year} ${quake.time.hour}:${quake.time.minute.toString().padLeft(2, '0')}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Colors.grey.shade600,
+                                    ),
+                              ),
                             ],
                           );
                         },
