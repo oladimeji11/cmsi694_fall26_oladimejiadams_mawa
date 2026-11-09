@@ -6,18 +6,21 @@ import '../models/weather_alert.dart';
 import '../models/weather_info.dart';
 import '../services/auth_service.dart';
 import '../services/earthquake_service.dart';
+import '../services/llm_service.dart';
 import '../services/location_service.dart';
 import '../services/weather_service.dart';
+import 'llm_test_screen.dart';
 import 'login_screen.dart';
 
 /// The Home landing screen dashboard displaying user greeting, current weather metrics,
-/// active weather alerts, recent earthquakes grouped by ring distance, account profile details, and location permission management.
+/// active weather alerts, recent earthquakes grouped by ring distance, account profile details, and AI model developer test navigation.
 class HomeScreen extends StatefulWidget {
   final UserProfile userProfile;
   final AuthService authService;
   final LocationService? locationService;
   final WeatherService? weatherService;
   final EarthquakeService? earthquakeService;
+  final LlmService? llmService;
 
   const HomeScreen({
     super.key,
@@ -26,6 +29,7 @@ class HomeScreen extends StatefulWidget {
     this.locationService,
     this.weatherService,
     this.earthquakeService,
+    this.llmService,
   });
 
   @override
@@ -36,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final LocationService _locationService;
   late final WeatherService _weatherService;
   late final EarthquakeService _earthquakeService;
+  late final LlmService _llmService;
 
   bool _isPermanentlyDenied = false;
   String? _geocodedAddress;
@@ -58,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _locationService = widget.locationService ?? LocationService();
     _weatherService = widget.weatherService ?? WeatherService();
     _earthquakeService = widget.earthquakeService ?? EarthquakeService();
+    _llmService = widget.llmService ?? LlmService();
 
     // Register lifecycle observer to listen for app resume events
     WidgetsBinding.instance.addObserver(this);
@@ -364,6 +370,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('MAWA'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.smart_toy_outlined),
+            tooltip: 'AI Model Connection Test',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LlmTestScreen(llmService: _llmService),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Log Out',
